@@ -36,9 +36,11 @@ package fr.paris.lutece.plugins.mylutece.modules.openam.service;
 import fr.paris.lutece.portal.service.util.AppPropertiesService;
 import fr.paris.lutece.util.httpaccess.HttpAccess;
 import fr.paris.lutece.util.httpaccess.HttpAccessException;
+import fr.paris.lutece.util.httpaccess.InvalidResponseStatus;
 import fr.paris.lutece.util.url.UrlItem;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Map;
 import java.util.Map.Entry;
@@ -50,7 +52,7 @@ public class OpenamAPI
 {
     private static final String PROPERTY_API_CALL_DEBUG = "mylutece-openam.api.debug";
     private static final String KEY_ERROR_MSG = "str";
-    public static Logger _logger = Logger.getLogger( Constants.LOGGER_OPENAM );
+    public static Logger _logger = LogManager.getLogger( Constants.LOGGER_OPENAM );
     public static boolean _bDebug = AppPropertiesService.getPropertyBoolean( PROPERTY_API_CALL_DEBUG, false );
 
     // Variables declarations
@@ -207,7 +209,7 @@ public class OpenamAPI
 
             if ( _bDebug )
             {
-                _logger.debug( "API call : " + getCallUrl( url.getUrl( ), mapParameters ) );
+                _logger.debug( "API call : {}", getCallUrl( url.getUrl( ), mapParameters ) );
             }
 
             // if ( !StringUtils.isEmpty( strResponse ) )
@@ -219,8 +221,8 @@ public class OpenamAPI
         }
         catch( HttpAccessException ex )
         {
-            _logger.error( "Error calling method '" + strMethod + " - " + ex.getMessage( ), ex );
-            throw new OpenamAPIException( ex.getResponseCode( ).toString( ) );
+            _logger.error( "Error calling method '{} - {}", strMethod, ex.getMessage( ), ex );
+            throw new OpenamAPIException( ( ex instanceof InvalidResponseStatus ) ? String.valueOf( ( (InvalidResponseStatus) ex ).getResponseStatus( ) ) : ex.getMessage( ) );
         }
 
         return strResponse;

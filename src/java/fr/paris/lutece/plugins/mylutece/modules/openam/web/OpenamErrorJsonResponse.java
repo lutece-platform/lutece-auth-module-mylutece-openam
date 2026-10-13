@@ -45,11 +45,25 @@ public class OpenamErrorJsonResponse extends ErrorJsonResponse
     private static final long serialVersionUID = 5100059838966010325L;
     private String _strToken;
 
+    /**
+     * Builds an error response.
+     *
+     * @param strErrorCode
+     *            the error code
+     */
     public OpenamErrorJsonResponse( String strErrorCode )
     {
         super( strErrorCode );
     }
 
+    /**
+     * Builds an error response carrying a new security token.
+     *
+     * @param strErrorCode
+     *            the error code
+     * @param strToken
+     *            the security token
+     */
     public OpenamErrorJsonResponse( String strErrorCode, String strToken )
     {
         super( strErrorCode );

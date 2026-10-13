@@ -33,20 +33,21 @@
  */
 package fr.paris.lutece.plugins.mylutece.modules.openam.web;
 
-import fr.paris.lutece.plugins.mylutece.modules.openam.service.OpenamLuteceUserSessionService;
+import fr.paris.lutece.plugins.mylutece.modules.openam.service.IOpenamLuteceUserSessionService;
 
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.enterprise.inject.spi.CDI;
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * ParisConnectLuteceFilters
@@ -54,7 +55,8 @@ import javax.servlet.http.HttpServletResponse;
  */
 public class NotifyLuteceUserFilter implements Filter
 {
-    private final static String PARAMETER_UID = "uid";
+    private static final String PARAMETER_UID = "uid";
+    private IOpenamLuteceUserSessionService _userSessionService;
 
     /**
      *
@@ -63,7 +65,6 @@ public class NotifyLuteceUserFilter implements Filter
     @Override
     public void destroy( )
     {
-        // nothing
     }
 
     /**
@@ -80,7 +81,7 @@ public class NotifyLuteceUserFilter implements Filter
 
         if ( !StringUtils.isEmpty( strGuidParameter ) )
         {
-            OpenamLuteceUserSessionService.getInstance( ).notifyLuteceUserUpdating( strGuidParameter );
+            _userSessionService.notifyLuteceUserUpdating( strGuidParameter );
         }
 
         response.setStatus( HttpServletResponse.SC_OK );
@@ -93,6 +94,6 @@ public class NotifyLuteceUserFilter implements Filter
     @Override
     public void init( FilterConfig config ) throws ServletException
     {
-        // nothing
+        _userSessionService = CDI.current( ).select( IOpenamLuteceUserSessionService.class ).get( );
     }
 }

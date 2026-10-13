@@ -35,24 +35,24 @@ package fr.paris.lutece.plugins.mylutece.modules.openam.web;
 
 import fr.paris.lutece.plugins.mylutece.modules.openam.authentication.OpenamAuthentication;
 import fr.paris.lutece.plugins.mylutece.modules.openam.authentication.OpenamUser;
-import fr.paris.lutece.plugins.mylutece.modules.openam.service.OpenamLuteceUserSessionService;
+import fr.paris.lutece.plugins.mylutece.modules.openam.service.IOpenamLuteceUserSessionService;
 import fr.paris.lutece.plugins.mylutece.modules.openam.service.OpenamService;
 import fr.paris.lutece.portal.service.security.LuteceUser;
 import fr.paris.lutece.portal.service.security.SecurityService;
-import fr.paris.lutece.portal.service.spring.SpringContextService;
 
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.enterprise.inject.spi.CDI;
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * ParisConnectLuteceFilters
@@ -60,6 +60,10 @@ import javax.servlet.http.HttpServletResponse;
  */
 public class OpenamLuteceFilter implements Filter
 {
+    private OpenamService _openamService;
+    private OpenamAuthentication _openamAuthentication;
+    private IOpenamLuteceUserSessionService _userSessionService;
+
     /**
      *
      * {@inheritDoc}
@@ -67,7 +71,6 @@ public class OpenamLuteceFilter implements Filter
     @Override
     public void destroy( )
     {
-        // nothing
     }
 
     /**
@@ -80,10 +83,9 @@ public class OpenamLuteceFilter implements Filter
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         LuteceUser user = SecurityService.getInstance( ).getRegisteredUser( request );
 
-        if ( ( user == null ) || !OpenamLuteceUserSessionService.getInstance( ).isLuteceUserUpToDate( request.getSession( true ).getId( ) ) )
+        if ( ( user == null ) || !_userSessionService.isLuteceUserUpToDate( request.getSession( true ).getId( ) ) )
         {
-            OpenamAuthentication openamAuthentication = (OpenamAuthentication) SpringContextService.getBean( "mylutece-openam.authentication" );
-            user = openamAuthentication.getHttpAuthenticatedUser( request );
+            user = _openamAuthentication.getHttpAuthenticatedUser( request );
 
             if ( user != null )
             {
@@ -91,37 +93,32 @@ public class OpenamLuteceFilter implements Filter
             }
             else
             {
-                String strConnexionCookie = OpenamService.getInstance( ).getConnectionCookie( request );
+                String strConnexionCookie = _openamService.getConnectionCookie( request );
 
-                // if the request contains connection cookie and the user can not be retrieved removed connection cookie
                 if ( !StringUtils.isEmpty( strConnexionCookie ) )
                 {
-                    // remove connexion cookie
-                    OpenamService.getInstance( ).removeConnectionCookie( (HttpServletResponse) response );
+                    _openamService.removeConnectionCookie( (HttpServletResponse) response );
                 }
             }
         }
         else
             if ( user instanceof OpenamUser )
             {
-                // Validate Token
 
-                if ( !OpenamService.getInstance( ).isTokenValidated( ( (OpenamUser) user ).getSubjectId( ) ) )
+                if ( !_openamService.isTokenValidated( ( (OpenamUser) user ).getSubjectId( ) ) )
                 {
-                    // remove connexion cookie and logout user
-                    OpenamService.getInstance( ).removeConnectionCookie( (HttpServletResponse) response );
+                    _openamService.removeConnectionCookie( (HttpServletResponse) response );
                     SecurityService.getInstance( ).logoutUser( request );
                 }
                 else
                 {
 
-                    String strConnexionCookie = OpenamService.getInstance( ).getConnectionCookie( request );
+                    String strConnexionCookie = _openamService.getConnectionCookie( request );
 
-                    // if the request does not contains the openam connection cookie
                     if ( ( !StringUtils.isEmpty( ( (OpenamUser) user ).getSubjectId( ) ) )
                             && ( ( strConnexionCookie == null ) || ( !strConnexionCookie.equals( ( (OpenamUser) user ).getSubjectId( ) ) ) ) )
                     {
-                        OpenamService.getInstance( ).setConnectionCookie( ( (OpenamUser) user ).getSubjectId( ), (HttpServletResponse) response );
+                        _openamService.setConnectionCookie( ( (OpenamUser) user ).getSubjectId( ), (HttpServletResponse) response );
                     }
                 }
             }
@@ -136,6 +133,8 @@ public class OpenamLuteceFilter implements Filter
     @Override
     public void init( FilterConfig config ) throws ServletException
     {
-        // nothing
+        _openamService = CDI.current( ).select( OpenamService.class ).get( );
+        _openamAuthentication = CDI.current( ).select( OpenamAuthentication.class ).get( );
+        _userSessionService = CDI.current( ).select( IOpenamLuteceUserSessionService.class ).get( );
     }
 }

@@ -33,11 +33,11 @@
  */
 package fr.paris.lutece.plugins.mylutece.modules.openam.listener;
 
-import fr.paris.lutece.plugins.mylutece.modules.openam.service.OpenamLuteceUserSessionService;
-import fr.paris.lutece.portal.service.security.LuteceUser;
+import fr.paris.lutece.plugins.mylutece.modules.openam.service.IOpenamLuteceUserSessionService;
 
-import javax.servlet.http.HttpSessionEvent;
-import javax.servlet.http.HttpSessionListener;
+import jakarta.enterprise.inject.spi.CDI;
+import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionListener;
 
 /**
  * LimitConnectedUsersSessionListener
@@ -58,6 +58,6 @@ public final class OpenamLuteceUserSessionListener implements HttpSessionListene
     @Override
     public void sessionDestroyed( HttpSessionEvent sessionEvent )
     {
-        OpenamLuteceUserSessionService.getInstance( ).removeLuteceUserSession( sessionEvent.getSession( ).getId( ) );
+        CDI.current( ).select( IOpenamLuteceUserSessionService.class ).get( ).removeLuteceUserSession( sessionEvent.getSession( ).getId( ) );
     }
 }

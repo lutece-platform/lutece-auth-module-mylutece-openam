@@ -33,13 +33,43 @@
  */
 package fr.paris.lutece.plugins.mylutece.modules.openam.service;
 
+/**
+ * Tracks the HTTP sessions of each OpenAM user.
+ */
 public interface IOpenamLuteceUserSessionService
 {
+    /**
+     * Tells whether the user of a session is up to date, and marks it up to date.
+     *
+     * @param strSession
+     *            the session id
+     * @return false when the user was notified as changed since the last call
+     */
     boolean isLuteceUserUpToDate( String strSession );
 
+    /**
+     * Records a session of a user.
+     *
+     * @param strLuteceUserName
+     *            the user name
+     * @param strSession
+     *            the session id
+     */
     void addLuteceUserSession( String strLuteceUserName, String strSession );
 
+    /**
+     * Forgets a session.
+     *
+     * @param strSession
+     *            the session id
+     */
     void removeLuteceUserSession( String strSession );
 
+    /**
+     * Marks every session of a user as out of date.
+     *
+     * @param strLuteceUserName
+     *            the user name
+     */
     void notifyLuteceUserUpdating( String strLuteceUserName );
 }
