@@ -42,6 +42,9 @@ public class OpenamAuthenticationAgentException extends Exception
 {
     private static final long serialVersionUID = -2375566306839951530L;
 
+    /**
+     * Builds the exception.
+     */
     public OpenamAuthenticationAgentException( )
     {
         super( );

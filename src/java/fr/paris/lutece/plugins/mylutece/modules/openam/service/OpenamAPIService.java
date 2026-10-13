@@ -38,15 +38,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
-import net.sf.json.JSONSerializer;
-import fr.paris.lutece.portal.service.spring.SpringContextService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 /**
  * OpenamAPIService
  */
-public final class OpenamAPIService
+@ApplicationScoped
+public class OpenamAPIService
 {
     public static final String USER_ATTRINUTE_NAME = "userdetails.attribute.name";
     public static final String USER_ATTRINUTE_VALUE = "userdetails.attribute.value";
@@ -61,19 +66,23 @@ public final class OpenamAPIService
     private static final String KEY_RESULT = "result";
     private static final String SEPARATOR_COMMA = ",";
 
-    // HEADERS
     private static final String HEADER_EMAIL = "X-OpenAM-Username";
     private static final String HEADER_PASSWORD = "X-OpenAM-Password";
     private static final String HEADER_CONTENT_TYPE = "Content-Type";
     private static final String HEADER_CONTENT_TYPE_JSON_VALUE = "application/json";
-    private static final OpenamAPI _authenticateAPI = SpringContextService.getBean( "mylutece-openam.apiAuthenticate" );
-    private static final OpenamAPI _sessionAPI = SpringContextService.getBean( "mylutece-openam.apiSession" );
-    private static final OpenamAPI _usersAPI = SpringContextService.getBean( "mylutece-openam.apiUsers" );
+    private static final ObjectMapper MAPPER = new ObjectMapper( );
 
-    /** Private constructor */
-    private OpenamAPIService( )
-    {
-    }
+    @Inject
+    @Named( OpenamAPIProducer.BEAN_API_AUTHENTICATE )
+    private OpenamAPI _authenticateAPI;
+
+    @Inject
+    @Named( OpenamAPIProducer.BEAN_API_SESSION )
+    private OpenamAPI _sessionAPI;
+
+    @Inject
+    @Named( OpenamAPIProducer.BEAN_API_USERS )
+    private OpenamAPI _usersAPI;
 
     /**
      * Process login
@@ -82,28 +91,21 @@ public final class OpenamAPIService
      *            The User's name
      * @param strUserPassword
      *            The User's password
-     * @return The response provided by the API in JSON format
+     * @return The token id provided by the API, or null
+     * @throws OpenamAPIException
+     *             if an error occurs
      */
-    public static String doLogin( String strUserName, String strUserPassword ) throws OpenamAPIException
+    public String doLogin( String strUserName, String strUserPassword ) throws OpenamAPIException
     {
-        String strResponse = null;
-        String strTokenId = null;
-        Map<String, String> headerParameters = new HashMap<String, String>( );
+        Map<String, String> headerParameters = new HashMap<>( );
 
         headerParameters.put( HEADER_EMAIL, strUserName );
         headerParameters.put( HEADER_PASSWORD, strUserPassword );
         headerParameters.put( HEADER_CONTENT_TYPE, HEADER_CONTENT_TYPE_JSON_VALUE );
 
-        strResponse = _authenticateAPI.callMethod( "", null, headerParameters, true );
+        JsonNode jo = parse( _authenticateAPI.callMethod( "", null, headerParameters, true ) );
 
-        JSONObject jo = (JSONObject) JSONSerializer.toJSON( strResponse );
-
-        if ( jo.containsKey( KEY_TOKEN_ID ) )
-        {
-            strTokenId = jo.getString( KEY_TOKEN_ID );
-        }
-
-        return strTokenId;
+        return jo.has( KEY_TOKEN_ID ) ? jo.get( KEY_TOKEN_ID ).asText( ) : null;
     }
 
     /**
@@ -111,21 +113,20 @@ public final class OpenamAPIService
      * 
      * @param strSubjectId
      *            The 'account' cookie value
-     * @return The UID if the cookie is valid otherwyse false
+     * @return The UID if the cookie is valid otherwise null
+     * @throws OpenamAPIException
+     *             if an error occurs
      */
-    public static String isValidate( String strSubjectId ) throws OpenamAPIException
+    public String isValidate( String strSubjectId ) throws OpenamAPIException
     {
-        Map<String, String> headerParameters = new HashMap<String, String>( );
+        Map<String, String> headerParameters = new HashMap<>( );
         headerParameters.put( HEADER_CONTENT_TYPE, HEADER_CONTENT_TYPE_JSON_VALUE );
 
-        String strResponse = _sessionAPI.callMethod( strSubjectId + "?_action=validate", null, headerParameters, true );
-        JSONObject jo = (JSONObject) JSONSerializer.toJSON( strResponse );
+        JsonNode jo = parse( _sessionAPI.callMethod( strSubjectId + "?_action=validate", null, headerParameters, true ) );
 
-        String strValidResponse = jo.getString( KEY_VALID );
-
-        if ( new Boolean( strValidResponse ) )
+        if ( Boolean.parseBoolean( jo.path( KEY_VALID ).asText( ) ) )
         {
-            return jo.getString( KEY_UID );
+            return jo.path( KEY_UID ).asText( null );
         }
 
         return null;
@@ -134,82 +135,135 @@ public final class OpenamAPIService
     /**
      * Process user logout
      * 
-     * @param strPCUID
-     *            the user PCUID
-     * @return The response provided by the API in JSON format
+     * @param strCookieName
+     *            the OpenAM cookie name
+     * @param strSubjectId
+     *            the user token id
+     * @return The result provided by the API, or null
+     * @throws OpenamAPIException
+     *             if an error occurs
      */
-    public static String doDisconnect( String strCookieName, String strSubjectId ) throws OpenamAPIException
+    public String doDisconnect( String strCookieName, String strSubjectId ) throws OpenamAPIException
     {
-        Map<String, String> headerParameters = new HashMap<String, String>( );
+        Map<String, String> headerParameters = new HashMap<>( );
         headerParameters.put( strCookieName, strSubjectId );
         headerParameters.put( HEADER_CONTENT_TYPE, HEADER_CONTENT_TYPE_JSON_VALUE );
 
-        String strResult = null;
+        JsonNode jo = parse( _sessionAPI.callMethod( "?_action=logout", null, headerParameters, true ) );
 
-        String strResponse = _sessionAPI.callMethod( "?_action=logout", null, headerParameters, true );
-
-        JSONObject jo = (JSONObject) JSONSerializer.toJSON( strResponse );
-
-        if ( jo.containsKey( KEY_RESULT ) )
-        {
-            strResult = jo.getString( KEY_RESULT );
-        }
-
-        return strResult;
+        return jo.has( KEY_RESULT ) ? jo.get( KEY_RESULT ).asText( ) : null;
     }
 
     /**
      * Get user infos
      * 
-     * @param strPCUID
+     * @param strSubjectId
+     *            the user token id
+     * @param strUserId
      *            The UserID
-     * @return The response provided by the API in JSON format
+     * @param strCookieName
+     *            the OpenAM cookie name
+     * @param mapUserMapping
+     *            the OpenAM attributes mapped to Lutece user attributes
+     * @param strUserAttributeKey
+     *            the OpenAM attribute holding the user name
+     * @return the user attributes read from OpenAM
+     * @throws OpenamAPIException
+     *             if an error occurs
      */
-    public static Map<String, String> getUserInformations( String strSubjectId, String strUserId, String strCookieName,
+    public Map<String, String> getUserInformations( String strSubjectId, String strUserId, String strCookieName,
             Map<String, List<String>> mapUserMapping, String strUserAttributeKey ) throws OpenamAPIException
     {
-        Map<String, String> headerParameters = new HashMap<String, String>( );
+        Map<String, String> headerParameters = new HashMap<>( );
         headerParameters.put( strCookieName, strSubjectId );
 
-        Map<String, String> mapInfos = new HashMap<String, String>( );
+        Map<String, String> mapInfos = new HashMap<>( );
 
         String strResponse = _usersAPI.callMethod( strUserId + "?_fields=" + buildRestrictListOfAttributesReturn( strUserAttributeKey, mapUserMapping ), null,
                 headerParameters, true, true );
-        JSONObject jo = (JSONObject) JSONSerializer.toJSON( strResponse );
-        JSONArray joArray;
+        JsonNode jo = parse( strResponse );
 
-        if ( jo.containsKey( strUserAttributeKey ) )
-        {
-            joArray = jo.getJSONArray( strUserAttributeKey );
-
-            for ( int i = 0; i < joArray.size( ); i++ )
-            {
-                mapInfos.put( strUserAttributeKey, joArray.getString( i ) );
-            }
-        }
+        putValues( jo, strUserAttributeKey, mapInfos );
 
         if ( mapUserMapping != null )
         {
             for ( Entry<String, List<String>> entry : mapUserMapping.entrySet( ) )
             {
-                if ( jo.containsKey( entry.getKey( ) ) )
-                {
-                    joArray = jo.getJSONArray( entry.getKey( ) );
-
-                    for ( int i = 0; i < joArray.size( ); i++ )
-                    {
-                        mapInfos.put( entry.getKey( ), joArray.getString( i ) );
-                    }
-                }
+                putValues( jo, entry.getKey( ), mapInfos );
             }
         }
 
         return mapInfos;
     }
 
+    /**
+     * Puts the values of an OpenAM attribute into a map, the last value winning.
+     *
+     * @param jo
+     *            the OpenAM user
+     * @param strKey
+     *            the attribute name
+     * @param mapInfos
+     *            the map to fill
+     */
+    private static void putValues( JsonNode jo, String strKey, Map<String, String> mapInfos )
+    {
+        if ( jo.has( strKey ) )
+        {
+            JsonNode node = jo.get( strKey );
+
+            if ( node.isArray( ) )
+            {
+                for ( JsonNode value : node )
+                {
+                    mapInfos.put( strKey, value.asText( ) );
+                }
+            }
+            else
+            {
+                mapInfos.put( strKey, node.asText( ) );
+            }
+        }
+    }
+
+    /**
+     * Parses an API response.
+     *
+     * @param strResponse
+     *            the response in JSON format
+     * @return the parsed response, a missing node when the response is empty
+     * @throws OpenamAPIException
+     *             if the response is not JSON
+     */
+    private static JsonNode parse( String strResponse ) throws OpenamAPIException
+    {
+        if ( strResponse == null || strResponse.isBlank( ) )
+        {
+            return MissingNode.getInstance( );
+        }
+
+        try
+        {
+            return MAPPER.readTree( strResponse );
+        }
+        catch( JsonProcessingException e )
+        {
+            throw new OpenamAPIException( e.getMessage( ) );
+        }
+    }
+
+    /**
+     * Builds the list of attributes requested from OpenAM.
+     *
+     * @param strUserAttributeKey
+     *            the OpenAM attribute holding the user name
+     * @param mapUserMapping
+     *            the OpenAM attributes mapped to Lutece user attributes
+     * @return the attributes separated by commas
+     */
     private static String buildRestrictListOfAttributesReturn( String strUserAttributeKey, Map<String, List<String>> mapUserMapping )
     {
-        StringBuffer strFields = new StringBuffer( );
+        StringBuilder strFields = new StringBuilder( );
         strFields.append( strUserAttributeKey );
 
         if ( ( mapUserMapping != null ) && !mapUserMapping.isEmpty( ) )

@@ -33,12 +33,25 @@
  */
 package fr.paris.lutece.plugins.mylutece.modules.openam.service;
 
+/**
+ * A session of an OpenAM user, and whether its user is up to date.
+ */
 public class OpenamLuteceUserSession
 {
     private String _strIdSession;
     private String _strLuteceUserName;
-    private boolean _bUpToDate;
+    private volatile boolean _bUpToDate;
 
+    /**
+     * Builds a session.
+     *
+     * @param strIdSession
+     *            the session id
+     * @param strLuteceUserName
+     *            the user name
+     * @param bUpToDate
+     *            whether the user is up to date
+     */
     public OpenamLuteceUserSession( String strIdSession, String strLuteceUserName, boolean bUpToDate )
     {
         _strIdSession = strIdSession;
@@ -46,31 +59,64 @@ public class OpenamLuteceUserSession
         _bUpToDate = bUpToDate;
     }
 
+    /**
+     * Returns the session id.
+     *
+     * @return the session id
+     */
     public String getIdSession( )
     {
         return _strIdSession;
     }
 
+    /**
+     * Sets the session id.
+     *
+     * @param _strIdSession
+     *            the session id
+     */
     public void setIdSession( String _strIdSession )
     {
         this._strIdSession = _strIdSession;
     }
 
+    /**
+     * Returns the user name.
+     *
+     * @return the user name
+     */
     public String getLuteceUserName( )
     {
         return _strLuteceUserName;
     }
 
+    /**
+     * Sets the user name.
+     *
+     * @param _strLuteceUserName
+     *            the user name
+     */
     public void setLuteceUserName( String _strLuteceUserName )
     {
         this._strLuteceUserName = _strLuteceUserName;
     }
 
+    /**
+     * Tells whether the user is up to date.
+     *
+     * @return true if the user is up to date
+     */
     public boolean isUpToDate( )
     {
         return _bUpToDate;
     }
 
+    /**
+     * Sets whether the user is up to date.
+     *
+     * @param _bUpToDate
+     *            whether the user is up to date
+     */
     public void setUpToDate( boolean _bUpToDate )
     {
         this._bUpToDate = _bUpToDate;
